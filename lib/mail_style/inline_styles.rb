@@ -1,6 +1,5 @@
 require 'uri'
 require 'nokogiri'
-require 'css_parser'
 
 module MailStyle
   module InlineStyles
@@ -29,48 +28,25 @@ module MailStyle
         # Parse original html
         html_document = create_html_document(html)
         html_document = absolutize_image_sources(html_document)
-
-        # Write inline styles
-        element_styles = {}
         
-        css_parser.each_selector do |selector, declaration, specificity|
-          html_document.css(selector).each do |element|
-            declaration.to_s.split(';').each do |style|
-              # Split style in attribute and value
-              attribute, value = style.split(':').map(&:strip)
-              
-              # Set element style defaults
-              element_styles[element] ||= {}
-              element_styles[element][attribute] ||= { :specificity => 0, :value => '' }
-              
-              # Update attribute value if specificity is higher than previous values
-              if element_styles[element][attribute][:specificity] <= specificity
-                element_styles[element][attribute] = { :specificity => specificity, :value => value }
-              end
-            end
-          end
-        end
-        
-        # Loop through element styles
-        element_styles.each_pair do |element, attributes|
-          # Elements current styles
-          current_style = element['style'].to_s.split(';').sort
-          
-          # Elements new styles
-          new_style = attributes.map{|attribute, style| "#{attribute}: #{update_image_urls(style[:value])}"}
-
-          # Concat styles
-          style = (current_style + new_style).compact.uniq.map(&:strip).sort
-
-          # Set new styles
-          element['style'] = style.join(';')
-        end
+        # Render styles inline
+        html_document = css_parser.render_inline(html_document)
         
         # Strip all references to classes.
         html_document.css('*').remove_class
-        html_document.to_html
+        html = absolutize_background_image_urls(html_document.to_html)
       end
       
+      # Fix the urls of background images in css
+      def absolutize_background_image_urls(html)
+        html.scan(/url\(['"]?(.*)['"]?\)/).flatten.each do |url|
+          html.gsub!(url, absolutize_url(url, 'stylesheets'))
+        end
+        
+        html
+      end
+      
+      # Fix the source of <img /> tag
       def absolutize_image_sources(document)
         document.css('img').each do |img|
           src = img['src']
@@ -78,6 +54,11 @@ module MailStyle
         end
         
         document
+      end
+      
+      # TODO: Refactor this ugly method
+      def css_parser
+        "MailStyle::Parser::#{MailStyle.css_parser}".constantize.new(css_rules)
       end
       
       # Create Nokogiri html document from part contents and add/amend certain elements.
@@ -131,13 +112,6 @@ module MailStyle
         url
       end
 
-      # Css Parser
-      def css_parser
-        parser = CssParser::Parser.new
-        parser.add_block!(css_rules)
-        parser
-      end
-      
       # Css Rules
       def css_rules
         File.read(css_file)

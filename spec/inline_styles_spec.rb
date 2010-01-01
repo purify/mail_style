@@ -50,141 +50,152 @@ class TestMailer < ActionMailer::Base
   end
 end
 
-describe 'Inline styles' do
-  describe 'singlepart' do
-    before(:each) do
-      css_rules <<-EOF
-        body { background: #000 }
-        p { color: #f00; line-height: 1.5 }
-        .text { font-size: 14px }
-      EOF
-    end
+describe 'Inline styles using' do
+  [CssParser, CSSPool].each do |parser|   
+    describe parser do
+      before(:all) do
+        MailStyle.css_parser = parser
+      end
+      
+      describe 'singlepart' do
+        before(:each) do
+          css_rules <<-EOF
+            body { background: #000 }
+            p { color: #f00; line-height: 1.5 }
+            .text { font-size: 14px }
+          EOF
+        end
 
-    it "should apply styles for text/html" do
-      @email = TestMailer.deliver_test_singlepart_html(:real)
-      @email.body.should match(/<body style="background: #000">/)
-    end
+        it "should apply styles for text/html" do
+          @email = TestMailer.deliver_test_singlepart_html(:real)
+          @email.body.should match(/<body style="background: #000">/)
+        end
     
-    it "should do nothing for text/plain" do
-      @email = TestMailer.deliver_test_singlepart_plain(:real)
-      @email.body.should eql('<p class="text">Hello World</p>')
-    end
-  end
+        it "should do nothing for text/plain" do
+          @email = TestMailer.deliver_test_singlepart_plain(:real)
+          @email.body.should eql('<p class="text">Hello World</p>')
+        end
+      end
   
-  describe 'multipart' do
-    describe 'image urls' do
-      before(:each) do
-        # CSS rules
-        css_rules <<-EOF
-          p#image { background: url(../images/test-image.png)}
-        EOF
+      describe 'multipart' do
+        describe 'image urls' do
+          before(:each) do
+            # CSS rules
+            css_rules <<-EOF
+              p#image { background: url(../images/test-image.png)}
+            EOF
       
-        # Generate email
-        @email = TestMailer.deliver_test_image_urls(:real)
-        @html = html_part(@email)
-      end
+            # Generate email
+            @email = TestMailer.deliver_test_image_urls(:real)
+            @html = html_part(@email)
+          end
       
-      it "should make the css urls absolute" do
-        @html.should match(/<p.*style="background: url\(http:\/\/example\.com\/images\/test\-image\.png\)">/)
-      end
+          it "should make the css urls absolute" do
+            @html.should match(/<p.*style="background: url\(http:\/\/example\.com\/images\/test\-image\.png\)">/)
+          end
       
-      it "should make image sources absolute" do 
-        # Note: Nokogiri loses the closing slash from the <img> tag for some reason.
-        @html.should match(/<img src="http:\/\/example\.com\/images\/test\.jpg\">/)
-      end
-    end
+          it "should make image sources absolute" do 
+            # Note: Nokogiri loses the closing slash from the <img> tag for some reason.
+            @html.should match(/<img src="http:\/\/example\.com\/images\/test\.jpg\">/)
+          end
+        end
     
-    describe 'rendering inline styles' do
-      before(:each) do
-        css_rules <<-EOF
-          body { background: #000 }
-          .text { color: #0f0; font-size: 14px }
-          p { color: #f00; line-height: 1.5 }
-        EOF
+        describe 'rendering inline styles' do
+          before(:each) do
+            css_rules <<-EOF
+              body { background: #000 }
+              .text { color: #0f0; font-size: 14px }
+              p { color: #f00; line-height: 1.5 }
+            EOF
       
-        # Generate email
-        @email = TestMailer.deliver_test_multipart(:real)
-        @html = html_part(@email)
-      end
+            # Generate email
+            @email = TestMailer.deliver_test_multipart(:real)
+            @html = html_part(@email)
+          end
       
-      it "should add the correct xml namespace" do
-        @html.should match(/<html xmlns="http:\/\/www\.w3\.org\/1999\/xhtml">/)
-      end
+          it "should add the correct xml namespace" do
+            @html.should match(/<html xmlns="http:\/\/www\.w3\.org\/1999\/xhtml">/)
+          end
       
-      it "should write the xhtml 1.0 doctype" do
-        @html.should match(/<!DOCTYPE html PUBLIC "-\/\/W3C\/\/DTD XHTML 1\.0 Transitional\/\/EN" "http:\/\/www.w3.org\/TR\/xhtml1\/DTD\/xhtml1-transitional\.dtd">/mi)
-      end
+          it "should write the xhtml 1.0 doctype" do
+            @html.should match(/<!DOCTYPE html PUBLIC "-\/\/W3C\/\/DTD XHTML 1\.0 Transitional\/\/EN" "http:\/\/www.w3.org\/TR\/xhtml1\/DTD\/xhtml1-transitional\.dtd">/mi)
+          end
       
-      it "should write utf-8 content type meta tag" do
-        @html.should match(/<head>.*<meta http\-equiv="Content\-Type" content="text\/html; charset=utf\-8">.*<\/head>/mi)
-      end
+          it "should write utf-8 content type meta tag" do
+            @html.should match(/<head>.*<meta http\-equiv="Content\-Type" content="text\/html; charset=utf\-8">.*<\/head>/mi)
+          end
       
-      it "should wrap with html and body tag if missing" do
-        @html.should match(/<html.*>.*<body.*>.*<\/body>.*<\/html>/m)
-      end
+          it "should wrap with html and body tag if missing" do
+            @html.should match(/<html.*>.*<body.*>.*<\/body>.*<\/html>/m)
+          end
       
-      it "should add style to body" do
-        @html.should match(/<body style="background: #000">/)
-      end
+          it "should add style to body" do
+            @html.should match(/<body style="background: #000">/)
+          end
       
-      it "should remove classes from html" do
-        @html.should_not match(/<p.*class="text".*>/)
-      end
+          it "should remove classes from html" do
+            @html.should_not match(/<p.*class="text".*>/)
+          end
       
-      it "should add both styles to paragraph" do
-        @html.should match(/<p style="color: #0f0;font-size: 14px;line-height: 1.5">/)
-      end
-    end
+          it "should add both styles to paragraph" do
+            @html.should match(/<p style="color: #0f0;font-size: 14px;line-height: 1.5">/)
+          end
+        end
     
-    describe 'combining styles' do
-      it "should select the most specific style" do
-        css_rules <<-EOF
-          .text { color: #0f0; }
-          p { color: #f00; }
-        EOF
-        @email = TestMailer.deliver_test_multipart(:real)
-        @html = html_part(@email)
-        @html.should match(/<p style="color: #0f0">/)
-      end
-      it "should combine different properties for one element" do
-        css_rules <<-EOF
-          .text { font-size: 14px; }
-          p { color: #f00; }
-        EOF
-        @email = TestMailer.deliver_test_multipart(:real)
-        @html = html_part(@email)
-        @html.should match(/<p style="color: #f00;font-size: 14px">/)
-      end
-    end
-    
-    describe 'css file' do
-      it "should do nothing if no css file is set" do
-        @email = TestMailer.deliver_test_multipart(nil)
-        html_part(@email).should eql('<p class="text">Hello World</p>')
-      end
+        describe 'combining styles' do
+          it "should select the most specific style" do
+            css_rules <<-EOF
+              .text { color: #0f0; }
+              p { color: #f00; }
+            EOF
+        
+            @email = TestMailer.deliver_test_multipart(:real)
+            @html = html_part(@email)
+            @html.should match(/<p style="color: #0f0">/)
+          end
       
-      it "should raise MailStyle::CSSFileNotFound if css file does not exist" do
-        lambda {
-          TestMailer.deliver_test_multipart(:fake)
-        }.should raise_error(MailStyle::CSSFileNotFound)
+          it "should combine different properties for one element" do
+            css_rules <<-EOF
+              .text { font-size: 14px; }
+              p { color: #f00; }
+            EOF
+        
+            @email = TestMailer.deliver_test_multipart(:real)
+            @html = html_part(@email)
+            @html.should match(/<p style="color: #f00;font-size: 14px">/)
+          end
+        end
+    
+        describe 'css file' do
+          it "should do nothing if no css file is set" do
+            @email = TestMailer.deliver_test_multipart(nil)
+            html_part(@email).should eql('<p class="text">Hello World</p>')
+          end
+      
+          it "should raise MailStyle::CSSFileNotFound if css file does not exist" do
+            lambda {
+              TestMailer.deliver_test_multipart(:fake)
+            }.should raise_error(MailStyle::CSSFileNotFound)
+          end
+        end
+    
+        it 'should support inline styles without deliver' do
+          css_rules <<-EOF
+            body { background: #000 }
+            p { color: #f00; line-height: 1.5 }
+            .text { font-size: 14px }
+          EOF
+    
+          # Generate email
+          @email = TestMailer.create_test_multipart(:real)
+          html_part(@email).should match(/<body style="background: #000">/)
+        end
+    
+        it "should have two parts" do
+          @email = TestMailer.deliver_test_multipart
+          @email.parts.length.should eql(2)
+        end
       end
-    end
-    
-    it 'should support inline styles without deliver' do
-      css_rules <<-EOF
-        body { background: #000 }
-        p { color: #f00; line-height: 1.5 }
-        .text { font-size: 14px }
-      EOF
-    
-      # Generate email
-      @email = TestMailer.create_test_multipart(:real)
-      html_part(@email).should match(/<body style="background: #000">/)
-    end
-    
-    it "should have two parts" do
-      @email = TestMailer.deliver_test_multipart
-      @email.parts.length.should eql(2)
     end
   end
 end

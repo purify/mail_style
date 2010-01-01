@@ -1,6 +1,7 @@
 module MailStyle
   module InlineStyles
     module InstanceMethods
+      # Add support for SASS
       def css_file_with_sass
         if !Sass::Plugin.checked_for_updates || Sass::Plugin.options[:always_update] || Sass::Plugin.options[:always_check]
           Sass::Plugin.update_stylesheets
