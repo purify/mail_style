@@ -162,7 +162,11 @@ module MailStyle
           [host,protocol].each{|r| original_url.gsub!(r,"") }
           host = protocol+host unless host[URI::regexp(%w[http https])]
 
-          url = URI.join host, base_path, original_url
+          begin
+            url = URI.join host, base_path, original_url
+          rescue => e
+            url = ''
+          end
         end
 
         url.to_s
